@@ -10,9 +10,9 @@ type ComponentType uint
 
 // MessageComponent types.
 const (
-	ActionsRowComponent ComponentType = 1
-	ButtonComponent     ComponentType = 2
-	SelectMenuComponent ComponentType = 3
+	ComponentActionRow  ComponentType = 1
+	ComponentButton     ComponentType = 2
+	ComponentSelectMenu ComponentType = 3
 )
 
 // MessageComponent is a base interface for all message components.
@@ -36,11 +36,11 @@ func (umc *unmarshalableMessageComponent) UnmarshalJSON(src []byte) error {
 	}
 
 	switch v.Type {
-	case ActionsRowComponent:
+	case ComponentActionRow:
 		umc.MessageComponent = &ActionsRow{}
-	case ButtonComponent:
+	case ComponentButton:
 		umc.MessageComponent = &Button{}
-	case SelectMenuComponent:
+	case ComponentSelectMenu:
 		umc.MessageComponent = &SelectMenu{}
 	default:
 		return fmt.Errorf("unknown component type: %d", v.Type)
@@ -94,7 +94,7 @@ func (r *ActionsRow) UnmarshalJSON(data []byte) error {
 
 // Type is a method to get the type of a component.
 func (r ActionsRow) Type() ComponentType {
-	return ActionsRowComponent
+	return ComponentActionRow
 }
 
 // ButtonStyle is style of button.
@@ -102,19 +102,19 @@ type ButtonStyle uint
 
 // Button styles.
 const (
-	// PrimaryButton is a button with blurple color.
-	PrimaryButton ButtonStyle = 1
-	// SecondaryButton is a button with grey color.
-	SecondaryButton ButtonStyle = 2
-	// SuccessButton is a button with green color.
-	SuccessButton ButtonStyle = 3
-	// DangerButton is a button with red color.
-	DangerButton ButtonStyle = 4
-	// LinkButton is a special type of button which navigates to a URL. Has grey color.
-	LinkButton ButtonStyle = 5
+	// ButtonPrimary is a button with blurple color.
+	ButtonPrimary ButtonStyle = 1
+	// ButtonSecondary is a button with grey color.
+	ButtonSecondary ButtonStyle = 2
+	// ButtonSuccess is a button with green color.
+	ButtonSuccess ButtonStyle = 3
+	// ButtonDanger is a button with red color.
+	ButtonDanger ButtonStyle = 4
+	// ButtonLink is a special type of button which navigates to a URL. Has grey color.
+	ButtonLink ButtonStyle = 5
 )
 
-// ComponentEmoji represents button emoji, if it does have one.
+// ComponentEmoji represents a button's emoji, if it has one.
 type ComponentEmoji struct {
 	Name     string `json:"name,omitempty"`
 	ID       string `json:"id,omitempty"`
@@ -128,7 +128,7 @@ type Button struct {
 	Disabled bool           `json:"disabled"`
 	Emoji    ComponentEmoji `json:"emoji"`
 
-	// NOTE: Only button with LinkButton style can have link. Also, URL is mutually exclusive with CustomID.
+	// NOTE: Only button with ButtonLink style can have link. Also, URL is mutually exclusive with CustomID.
 	URL      string `json:"url,omitempty"`
 	CustomID string `json:"custom_id,omitempty"`
 }
@@ -138,7 +138,7 @@ func (b Button) MarshalJSON() ([]byte, error) {
 	type button Button
 
 	if b.Style == 0 {
-		b.Style = PrimaryButton
+		b.Style = ButtonPrimary
 	}
 
 	return json.Marshal(struct {
@@ -151,8 +151,8 @@ func (b Button) MarshalJSON() ([]byte, error) {
 }
 
 // Type is a method to get the type of a component.
-func (Button) Type() ComponentType {
-	return ButtonComponent
+func (b Button) Type() ComponentType {
+	return ComponentButton
 }
 
 // SelectMenuOption represents an option for a select menu.
@@ -180,7 +180,7 @@ type SelectMenu struct {
 
 // Type is a method to get the type of a component.
 func (SelectMenu) Type() ComponentType {
-	return SelectMenuComponent
+	return ComponentSelectMenu
 }
 
 // MarshalJSON is a method for marshaling SelectMenu to a JSON object.
