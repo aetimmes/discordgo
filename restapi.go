@@ -1873,6 +1873,402 @@ func (s *Session) ChannelNewsFollow(channelID, targetID string) (st *ChannelFoll
 }
 
 // ------------------------------------------------------------------------------------------------
+// Functions specific to Threads
+// ------------------------------------------------------------------------------------------------
+
+// ThreadListFilter is the struct that can be passed to buildFilter.
+type ThreadListFilter struct {
+	// Threads before this timestamp
+	Before *time.Time
+
+	// Optional; limit the number of threads returned
+	Limit int
+}
+
+// buildFilter puts together a query string for use when getting a thread list.
+func buildFilter(f *ThreadListFilter) (q string) {
+	if f == nil {
+		return
+	}
+	query := url.Values{}
+	if f.Before != nil {
+		query.Set("before", f.Before.Format(time.RFC3339))
+	}
+	if f.Limit != 0 {
+		query.Add("limit", strconv.Itoa(f.Limit))
+	}
+	if len(query) > 0 {
+		return "?" + query.Encode()
+	}
+
+	return
+}
+
+// ThreadJoin joins the session user to a thread
+// PUT/channels/{channel.id}/thread-members/@me
+func (s *Session) ThreadJoin(channelID string) (err error) {
+	_, err = s.RequestWithBucketID("PUT", EndpointThreadMember(channelID, "@me"), nil, EndpointChannel(channelID))
+	return
+}
+
+// ThreadMemberAdd adds another user to a thread
+// PUT /channels/{channel.id}/thread-members/{user.id}
+func (s *Session) ThreadMemberAdd(channelID, uID string) (err error) {
+	_, err = s.RequestWithBucketID("PUT", EndpointThreadMember(channelID, uID), nil, EndpointChannel(channelID))
+	return
+}
+
+// ThreadLeave removes the session user from a thread
+// DELETE /channels/{channel.id}/thread-members/@me
+func (s *Session) ThreadLeave(channelID string) (err error) {
+	_, err = s.RequestWithBucketID("DELETE", EndpointThreadMember(channelID, "@me"), nil, EndpointChannel(channelID))
+	return
+}
+
+// ThreadMemberRemove removes another user from a thread
+// PUT /channels/{channel.id}/thread-members/{user.id}
+func (s *Session) ThreadMemberRemove(channelID, uID string) (err error) {
+	_, err = s.RequestWithBucketID("DELETE", EndpointThreadMember(channelID, uID), nil, EndpointChannel(channelID))
+	return
+}
+
+// ThreadStartWithMessage creates a new public thread from an existing message.
+// When called on a ChannelTypeGuildText channel, creates a ChannelTypeGuildPublicThread.
+// When called on a ChannelTypeGuildNews channel, creates a ChannelTypeGuildNewsThread.
+// The id of the created thread will be the same as the id of the message,
+// and as such a message can only have a single thread created from it.
+//
+// POST /channels/{channel.id}/messages/{message.id}/threads
+func (s *Session) ThreadStartWithMessage(channelID, messageID string, data *ThreadCreateData) (st *Channel, err error) {
+	body, err := s.RequestWithBucketID("POST", EndpointChannelMessageThreads(channelID, messageID), data, EndpointChannel(channelID))
+
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// ThreadStartWithoutMessage creates a new thread that is not connected
+// to an existing message.
+// The created thread is always a ChannelTypeGuildPrivateThread
+//
+// POST /channels/{channel.id}/threads
+func (s *Session) ThreadStartWithoutMessage(channelID string, data *ThreadCreateData) (st *Channel, err error) {
+	body, err := s.RequestWithBucketID("POST", EndpointThreads(channelID), data, EndpointChannel(channelID))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// ThreadEditComplex edits an existing thread, replacing the parameters entirely with ThreadEdit struct
+// threadID  : The ID of a Thread
+// data          : The thread struct to send
+func (s *Session) ThreadEditComplex(threadID string, data *ThreadEditData) (st *Channel, err error) {
+	body, err := s.RequestWithBucketID("PATCH", EndpointChannel(threadID), data, EndpointChannel(threadID))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// ThreadMembers lists the members of a thread
+// GET /channels/{channel.id}/thread-members
+func (s *Session) ThreadMembers(channelID string) (st []*ThreadMember, err error) {
+	body, err := s.RequestWithBucketID("GET", EndpointThreadMembers(channelID), nil, EndpointChannel(channelID))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// ThreadsResponseBody is the returned data from the discord gateway
+// of some specific threads requests
+type ThreadsResponseBody struct {
+	Threads []*Channel      `json:"threads"`
+	Members []*ThreadMember `json:"members"`
+
+	// Whether there are potentially additional threads
+	// that could be returned on a subsequent call
+	HasMore bool `json:"has_more"`
+}
+
+// listActiveThreadsResponseBody is the returned data from ListActiveThreads
+type listActiveThreadsResponseBody struct {
+	Threads []*Channel      `json:"threads"`
+	Members []*ThreadMember `json:"members"`
+}
+
+// ThreadsListActive returns all active threads in the guild,
+// including public and private threads.
+// Threads are ordered by their `id`, in descending order.
+func (s *Session) ThreadsListActive(guildID string) (t *listActiveThreadsResponseBody, err error) {
+	body, err := s.RequestWithBucketID("GET", EndpointGuildActiveThreads(guildID), nil, EndpointGuild(guildID))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &t)
+	return
+}
+
+// ThreadsListPublicArchived returns archived threads in the channel that are public
+// GET /channels/{channel.id}/threads/archived/public
+func (s *Session) ThreadsListPublicArchived(channelID string, filter *ThreadListFilter) (st *ThreadsResponseBody, err error) {
+	uri := EndpointThreadsPublicArchived(channelID) + buildFilter(filter)
+
+	body, err := s.RequestWithBucketID("GET", uri, nil, EndpointChannel(channelID))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// ThreadsListPrivateArchived returns archived threads in the channel that are private
+// GET /channels/{channel.id}/threads/archived/private
+func (s *Session) ThreadsListPrivateArchived(channelID string, filter *ThreadListFilter) (st *ThreadsResponseBody, err error) {
+	uri := EndpointThreadsPrivateArchived(channelID) + buildFilter(filter)
+
+	body, err := s.RequestWithBucketID("GET", uri, nil, EndpointChannel(channelID))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// ThreadsListJoinedPrivateArchived returns archived threads in the channel
+// that are of type GUILD_PRIVATE_THREAD, and the user has joined
+// GET /channels/{channel.id}/users/@me/threads/archived/private
+func (s *Session) ThreadsListJoinedPrivateArchived(channelID string, filter *ThreadListFilter) (st *ThreadsResponseBody, err error) {
+	uri := EndpointThreadsPrivateArchived(channelID) + buildFilter(filter)
+
+	body, err := s.RequestWithBucketID("GET", uri, nil, EndpointChannel(channelID))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// ------------------------------------------------------------------------------------------------
+// Functions specific to Stickers
+// ------------------------------------------------------------------------------------------------
+
+// Sticker returns a Sticker based on its id.
+func (s *Session) Sticker(sID string) (a *Sticker, err error) {
+
+	endpoint := EndpointSticker(sID)
+
+	b, err := s.RequestWithBucketID("GET", endpoint, nil, EndpointSticker(sID))
+	if err != nil {
+		return nil, err
+	}
+
+	err = unmarshal(b, &a)
+	return
+}
+
+// StickerStandardNitroPacks gets the list of sticker packs available to premium users.
+func (s *Session) StickerStandardNitroPacks() (a *struct {
+	StickerPacks []StickerPack `json:"sticker_packs"`
+}, err error) {
+
+	endpoint := EndpointNitroStickerPacks
+
+	b, err := s.RequestWithBucketID("GET", endpoint, nil, EndpointStickers)
+	if err != nil {
+		return nil, err
+	}
+
+	err = unmarshal(b, &a)
+	return
+}
+
+// GuildStickers gets all stickers in a guild.
+func (s *Session) GuildStickers(gID string) (a *[]Sticker, err error) {
+
+	endpoint := EndpointGuildStickers(gID)
+
+	b, err := s.RequestWithBucketID("GET", endpoint, nil, EndpointGuildStickers(gID))
+	if err != nil {
+		return nil, err
+	}
+
+	err = unmarshal(b, &a)
+	return
+}
+
+// GuildSticker gets a sticker in a guild.
+func (s *Session) GuildSticker(gID, sID string) (a *Sticker, err error) {
+
+	endpoint := EndpointGuildSticker(gID, sID)
+
+	b, err := s.RequestWithBucketID("GET", endpoint, nil, EndpointGuildStickers(gID))
+	if err != nil {
+		return nil, err
+	}
+
+	err = unmarshal(b, &a)
+	return
+}
+
+// GuildStickerCreate creates a guild sticker. Image to use should be encoded as base64.
+func (s *Session) GuildStickerCreate(gID, image, name, description, tags string) (a *Sticker, err error) {
+
+	endpoint := EndpointGuildStickers(gID)
+
+	data := struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+
+		// The Discord name of an emoji. This will represent the sticker.
+		Tags string `json:"tags"`
+
+		File string `json:"file"`
+	}{
+		name,
+		description,
+		tags,
+		image,
+	}
+
+	b, err := s.RequestWithBucketID("POST", endpoint, data, EndpointGuildStickers(gID))
+	if err != nil {
+		return nil, err
+	}
+
+	err = unmarshal(b, &a)
+	return
+}
+
+// GuildStickerModify updates a guild sticker's information. Every field is optional.
+func (s *Session) GuildStickerModify(gID, sID, name, description, tags string) (a *Sticker, err error) {
+
+	endpoint := EndpointGuildSticker(gID, sID)
+
+	data := struct {
+		Name        string `json:"name,omitempty"`
+		Description string `json:"description,omitempty"`
+
+		// The Discord name of an emoji. This will represent the sticker.
+		Tags string `json:"tags,omitempty"`
+	}{
+		name,
+		description,
+		tags,
+	}
+
+	b, err := s.RequestWithBucketID("PATCH", endpoint, data, EndpointGuildStickers(gID))
+	if err != nil {
+		return nil, err
+	}
+
+	err = unmarshal(b, &a)
+	return
+}
+
+// GuildStickerDelete removes a sticker from a guild.
+func (s *Session) GuildStickerDelete(gID, sID string) (err error) {
+
+	endpoint := EndpointGuildSticker(gID, sID)
+
+	_, err = s.RequestWithBucketID("DELETE", endpoint, nil, EndpointGuildStickers(gID))
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+// ------------------------------------------------------------------------------------------------
+// Functions specific to Stage Instances
+// ------------------------------------------------------------------------------------------------
+
+// StageInstance gets a stage instance.
+func (s *Session) StageInstance(cID string) (st *StageInstance, err error) {
+
+	endpoint := EndpointStageInstance(cID)
+
+	_, err = s.RequestWithBucketID("GET", endpoint, nil, EndpointStageInstances)
+	if err != nil {
+		return nil, err
+	}
+
+	return
+}
+
+// StageInstanceCreate creates a stage instance in the channel ID given.
+// It is not clear what this endpoint returns because its return value is not specified.
+func (s *Session) StageInstanceCreate(cID, topic string, privacyLevel StagePrivacyLevel) (err error) {
+
+	endpoint := EndpointStageInstances
+
+	data := struct {
+		ChannelID    string            `json:"channel_id"`
+		Topic        string            `json:"topic"`
+		PrivacyLevel StagePrivacyLevel `json:"privacy_level,omitempty"`
+	}{
+		cID,
+		topic,
+		privacyLevel,
+	}
+
+	_, err = s.RequestWithBucketID("POST", endpoint, data, EndpointStageInstances)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+// StageInstanceModify modifies the properties of a stage channel.
+func (s *Session) StageInstanceModify(cID string, topic string, privacyLevel StagePrivacyLevel) (st *StageInstance, err error) {
+
+	endpoint := EndpointStageInstance(cID)
+
+	data := struct {
+		Topic        string            `json:"topic"`
+		PrivacyLevel StagePrivacyLevel `json:"privacy_level,omitempty"`
+	}{
+		topic,
+		privacyLevel,
+	}
+
+	_, err = s.RequestWithBucketID("PATCH", endpoint, data, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	return
+}
+
+// StageInstanceDelete removes the stage channel.
+func (s *Session) StageInstanceDelete(cID string) (err error) {
+
+	endpoint := EndpointStageInstance(cID)
+
+	_, err = s.RequestWithBucketID("DELETE", endpoint, nil, endpoint)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+// ------------------------------------------------------------------------------------------------
 // Functions specific to Discord Invites
 // ------------------------------------------------------------------------------------------------
 
@@ -1894,6 +2290,32 @@ func (s *Session) Invite(inviteID string) (st *Invite, err error) {
 func (s *Session) InviteWithCounts(inviteID string) (st *Invite, err error) {
 
 	body, err := s.RequestWithBucketID("GET", EndpointInvite(inviteID)+"?with_counts=true", nil, EndpointInvite(""))
+	if err != nil {
+		return
+	}
+
+	err = unmarshal(body, &st)
+	return
+}
+
+// InviteComplex returns an Invite, with the option to also include
+// the number of times it has been used and when it expires.
+func (s *Session) InviteComplex(inviteID string, withCounts, withExpiration bool) (st *Invite, err error) {
+
+	endpoint := EndpointInvite(inviteID)
+
+	v := url.Values{}
+	if withCounts {
+		v.Add("with_counts", "true")
+	}
+	if withExpiration {
+		v.Add("with_expiration", "true")
+	}
+	if len(v) > 0 {
+		endpoint = fmt.Sprintf("%s?%s", endpoint, v.Encode())
+	}
+
+	body, err := s.RequestWithBucketID("GET", endpoint, nil, EndpointInvite(""))
 	if err != nil {
 		return
 	}
@@ -2165,8 +2587,18 @@ func (s *Session) WebhookDeleteWithToken(webhookID, token string) (st *Webhook, 
 func (s *Session) WebhookExecute(webhookID, token string, wait bool, data *WebhookParams) (st *Message, err error) {
 	uri := EndpointWebhookToken(webhookID, token)
 
+	v := url.Values{}
+
 	if wait {
-		uri += "?wait=true"
+		v.Set("wait", "true")
+	}
+
+	if data.ThreadID != "" {
+		v.Set("thread_id", data.ThreadID)
+	}
+
+	if len(v) > 0 {
+		uri += "?" + v.Encode()
 	}
 
 	var response []byte

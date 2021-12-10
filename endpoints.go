@@ -14,7 +14,7 @@ package discordgo
 import "strconv"
 
 // APIVersion is the Discord API version used for the REST and Websocket API.
-var APIVersion = "8"
+var APIVersion = "9"
 
 // Known Discord API Endpoints.
 var (
@@ -23,14 +23,16 @@ var (
 	EndpointSmActive   = EndpointSm + "active.json"
 	EndpointSmUpcoming = EndpointSm + "upcoming.json"
 
-	EndpointDiscord    = "https://discord.com/"
-	EndpointAPI        = EndpointDiscord + "api/v" + APIVersion + "/"
-	EndpointGuilds     = EndpointAPI + "guilds/"
-	EndpointChannels   = EndpointAPI + "channels/"
-	EndpointUsers      = EndpointAPI + "users/"
-	EndpointGateway    = EndpointAPI + "gateway"
-	EndpointGatewayBot = EndpointGateway + "/bot"
-	EndpointWebhooks   = EndpointAPI + "webhooks/"
+	EndpointDiscord        = "https://discord.com/"
+	EndpointAPI            = EndpointDiscord + "api/v" + APIVersion + "/"
+	EndpointGuilds         = EndpointAPI + "guilds/"
+	EndpointChannels       = EndpointAPI + "channels/"
+	EndpointUsers          = EndpointAPI + "users/"
+	EndpointGateway        = EndpointAPI + "gateway"
+	EndpointGatewayBot     = EndpointGateway + "/bot"
+	EndpointWebhooks       = EndpointAPI + "webhooks/"
+	EndpointStickers       = EndpointAPI + "stickers/"
+	EndpointStageInstances = EndpointAPI + "stage-instances/"
 
 	EndpointCDN             = "https://cdn.discordapp.com/"
 	EndpointCDNAttachments  = EndpointCDN + "attachments/"
@@ -102,6 +104,9 @@ var (
 	EndpointGuildEmojis          = func(gID string) string { return EndpointGuilds + gID + "/emojis" }
 	EndpointGuildEmoji           = func(gID, eID string) string { return EndpointGuilds + gID + "/emojis/" + eID }
 	EndpointGuildBanner          = func(gID, hash string) string { return EndpointCDNBanners + gID + "/" + hash + ".png" }
+	EndpointGuildStickers        = func(gID string) string { return EndpointGuilds + gID + "/stickers" }
+	EndpointGuildSticker         = func(gID, sID string) string { return EndpointGuilds + gID + "/stickers/" + sID }
+	EndpointGuildActiveThreads   = func(gID string) string { return EndpointGuilds + gID + "/threads/active" }
 
 	EndpointChannel                   = func(cID string) string { return EndpointChannels + cID }
 	EndpointChannelPermissions        = func(cID string) string { return EndpointChannels + cID + "/permissions" }
@@ -115,9 +120,27 @@ var (
 	EndpointChannelMessagesPins       = func(cID string) string { return EndpointChannel(cID) + "/pins" }
 	EndpointChannelMessagePin         = func(cID, mID string) string { return EndpointChannel(cID) + "/pins/" + mID }
 	EndpointChannelMessageCrosspost   = func(cID, mID string) string { return EndpointChannel(cID) + "/messages/" + mID + "/crosspost" }
-	EndpointChannelFollow             = func(cID string) string { return EndpointChannel(cID) + "/followers" }
+	EndpointChannelUsers              = func(cID string) string { return EndpointChannel(cID) + "/users" }
+	EndpointChannelMessageThreads     = func(cID, mID string) string {
+		return EndpointChannels + cID + "/messages/" + mID + "/threads"
+	}
+
+	EndpointThreads                      = func(cID string) string { return EndpointChannel(cID) + "/threads" }
+	EndpointThreadMembers                = func(cID string) string { return EndpointChannel(cID) + "/thread-members" }
+	EndpointThreadMember                 = func(cID, uID string) string { return EndpointChannel(cID) + "/thread-members/" + uID }
+	EndpointThreadsArchived              = func(cID string) string { return EndpointThreads(cID) + "/archived" }
+	EndpointThreadsPublicArchived        = func(cID string) string { return EndpointThreadsArchived(cID) + "/public" }
+	EndpointThreadsPrivateArchived       = func(cID string) string { return EndpointThreadsArchived(cID) + "/private" }
+	EndpointThreadsJoinedPrivateArchived = func(cID string) string { return EndpointChannelUsers(cID) + "/@me/threads/archived/private" }
+
+	EndpointChannelFollow = func(cID string) string { return EndpointChannel(cID) + "/followers" }
 
 	EndpointGroupIcon = func(cID, hash string) string { return EndpointCDNChannelIcons + cID + "/" + hash + ".png" }
+
+	EndpointSticker           = func(sID string) string { return EndpointStickers + sID }
+	EndpointNitroStickerPacks = EndpointAPI + "/sticker-packs"
+
+	EndpointStageInstance = func(cID string) string { return EndpointStageInstances + cID }
 
 	EndpointChannelWebhooks = func(cID string) string { return EndpointChannel(cID) + "/webhooks" }
 	EndpointWebhook         = func(wID string) string { return EndpointWebhooks + wID }
