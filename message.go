@@ -22,24 +22,29 @@ type MessageType int
 
 // Block contains the valid known MessageType values
 const (
-	MessageTypeDefault                               MessageType = 0
-	MessageTypeRecipientAdd                          MessageType = 1
-	MessageTypeRecipientRemove                       MessageType = 2
-	MessageTypeCall                                  MessageType = 3
-	MessageTypeChannelNameChange                     MessageType = 4
-	MessageTypeChannelIconChange                     MessageType = 5
-	MessageTypeChannelPinnedMessage                  MessageType = 6
-	MessageTypeGuildMemberJoin                       MessageType = 7
-	MessageTypeUserPremiumGuildSubscription          MessageType = 8
-	MessageTypeUserPremiumGuildSubscriptionTierOne   MessageType = 9
-	MessageTypeUserPremiumGuildSubscriptionTierTwo   MessageType = 10
-	MessageTypeUserPremiumGuildSubscriptionTierThree MessageType = 11
-	MessageTypeChannelFollowAdd                      MessageType = 12
-	MessageTypeGuildDiscoveryDisqualified            MessageType = 14
-	MessageTypeGuildDiscoveryRequalified             MessageType = 15
-	MessageTypeReply                                 MessageType = 19
-	MessageTypeChatInputCommand                      MessageType = 20
-	MessageTypeContextMenuCommand                    MessageType = 23
+	MessageTypeDefault                                 MessageType = 0
+	MessageTypeRecipientAdd                            MessageType = 1
+	MessageTypeRecipientRemove                         MessageType = 2
+	MessageTypeCall                                    MessageType = 3
+	MessageTypeChannelNameChange                       MessageType = 4
+	MessageTypeChannelIconChange                       MessageType = 5
+	MessageTypeChannelPinnedMessage                    MessageType = 6
+	MessageTypeGuildMemberJoin                         MessageType = 7
+	MessageTypeUserPremiumGuildSubscription            MessageType = 8
+	MessageTypeUserPremiumGuildSubscriptionTierOne     MessageType = 9
+	MessageTypeUserPremiumGuildSubscriptionTierTwo     MessageType = 10
+	MessageTypeUserPremiumGuildSubscriptionTierThree   MessageType = 11
+	MessageTypeChannelFollowAdd                        MessageType = 12
+	MessageTypeGuildDiscoveryDisqualified              MessageType = 14
+	MessageTypeGuildDiscoveryRequalified               MessageType = 15
+	MessageTypeGuildDiscoveryGracePeriodInitialWarning MessageType = 16
+	MessageTypeGuildDiscoveryGracePeriodFinalWarning   MessageType = 17
+	MessageTypeThreadCreated                           MessageType = 18
+	MessageTypeReply                                   MessageType = 19
+	MessageTypeChatInputCommand                        MessageType = 20
+	MessageTypeThreadStarterMessage                    MessageType = 21
+	MessageTypeGuildInviteReminder                     MessageType = 22
+	MessageTypeContextMenuCommand                      MessageType = 23
 )
 
 // A Message stores all data related to a specific Discord message.
@@ -120,6 +125,9 @@ type Message struct {
 	// Is sent with Rich Presence-related chat embeds
 	Application *MessageApplication `json:"application"`
 
+	// If the message is a response to an Interaction, the interaction's application ID
+	ApplicationID string `json:"application_id"`
+
 	// MessageReference contains reference data sent with crossposted or reply messages.
 	// This does not contain the reference *to* this message; this is for when *this* message references another.
 	// To generate a reference to this message, use (*Message).Reference().
@@ -129,6 +137,20 @@ type Message struct {
 	// This is a combination of bit masks; the presence of a certain permission can
 	// be checked by performing a bitwise AND between this int and the flag.
 	Flags MessageFlags `json:"flags"`
+
+	// Available only for messages that are a reply or thread starter message.
+	// This is the message that is being referenced. Null if the originating message
+	// was deleted or if it wasn't loaded.
+	ReferencedMessage *Message `json:"referenced_message"`
+
+	// The message's response to an Interaction.
+	Interaction *MessageInteraction `json:"interaction"`
+
+	// The thread that was started from this message. Includes the thread member object.
+	Thread *Channel `json:"thread"`
+
+	// An array of Sticker objects, if any were sent.
+	StickerItems []*Sticker `json:"sticker_items"`
 }
 
 // UnmarshalJSON is a helper function to unmarshal the Message.
@@ -176,9 +198,12 @@ type MessageFlags int
 const (
 	MessageFlagsCrossPosted          MessageFlags = 1 << 0
 	MessageFlagsIsCrossPosted        MessageFlags = 1 << 1
-	MessageFlagsSupressEmbeds        MessageFlags = 1 << 2
+	MessageFlagsSuppressEmbeds       MessageFlags = 1 << 2
 	MessageFlagsSourceMessageDeleted MessageFlags = 1 << 3
 	MessageFlagsUrgent               MessageFlags = 1 << 4
+	MessageFlagsHasThread            MessageFlags = 1 << 5
+	MessageFlagsEphemeral            MessageFlags = 1 << 6
+	MessageFlagsLoading              MessageFlags = 1 << 7
 )
 
 // File stores info about files you e.g. send in messages.
@@ -186,6 +211,50 @@ type File struct {
 	Name        string
 	ContentType string
 	Reader      io.Reader
+}
+
+// StickerFormat is the file format of the Sticker.
+type StickerFormat int
+
+// Defines all known Sticker types.
+const (
+	StickerFormatTypePNG    StickerFormat = 1
+	StickerFormatTypeAPNG   StickerFormat = 2
+	StickerFormatTypeLottie StickerFormat = 3
+)
+
+// StickerType is the type of sticker.
+type StickerType int
+
+// Defines Sticker types.
+const (
+	StickerTypeStandard StickerType = 1
+	StickerTypeGuild    StickerType = 2
+)
+
+// Sticker represents a sticker object that can be sent in a Message.
+type Sticker struct {
+	ID          string        `json:"id"`
+	PackID      string        `json:"pack_id"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Tags        string        `json:"tags"`
+	FormatType  StickerFormat `json:"format_type"`
+	Available   bool          `json:"available"`
+	GuildID     string        `json:"guild_id"`
+	User        *User         `json:"user"`
+	SortValue   int           `json:"sort_value"`
+}
+
+// StickerPack represents a pack of standard stickers.
+type StickerPack struct {
+	ID             string    `json:"id"`
+	Stickers       []Sticker `json:"stickers"`
+	Name           string    `json:"name"`
+	SKUID          string    `json:"sku_id"`
+	CoverStickerID string    `json:"cover_sticker_id"`
+	Description    string    `json:"description"`
+	BannerAssetID  string    `json:"banner_asset_id"`
 }
 
 // MessageSend stores all parameters you can send with ChannelMessageSendComplex.

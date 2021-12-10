@@ -129,11 +129,12 @@ func (t InteractionType) String() string {
 
 // Interaction represents data of an interaction.
 type Interaction struct {
-	ID        string          `json:"id"`
-	Type      InteractionType `json:"type"`
-	Data      InteractionData `json:"-"`
-	GuildID   string          `json:"guild_id"`
-	ChannelID string          `json:"channel_id"`
+	ID            string          `json:"id"`
+	ApplicationID string          `json:"application_id"`
+	Type          InteractionType `json:"type"`
+	Data          InteractionData `json:"-"`
+	GuildID       string          `json:"guild_id"`
+	ChannelID     string          `json:"channel_id"`
 
 	// The message on which interaction was used.
 	// NOTE: this field is only filled when a button click triggered the interaction. Otherwise it will be nil.
@@ -406,18 +407,35 @@ type InteractionResponse struct {
 	Data *InteractionResponseData `json:"data,omitempty"`
 }
 
+// InteractionResponseDataFlag are the flags for InteractionResponseData
+type InteractionResponseDataFlag uint64
+
+// All known flags for InteractionResponseData
+const (
+	// InteractionResponseDataEphemeral means only the user receiving the message can see it.
+	InteractionResponseDataEphemeral InteractionResponseDataFlag = 1 << 6
+)
+
 // InteractionResponseData is response data for an interaction.
 type InteractionResponseData struct {
-	TTS             bool                    `json:"tts"`
-	Content         string                  `json:"content"`
-	Components      []MessageComponent      `json:"components"`
-	Embeds          []*MessageEmbed         `json:"embeds,omitempty"`
-	AllowedMentions *MessageAllowedMentions `json:"allowed_mentions,omitempty"`
-	Flags           uint64                  `json:"flags,omitempty"`
-	Files           []*File                 `json:"-"`
+	TTS             bool                        `json:"tts"`
+	Content         string                      `json:"content"`
+	Components      []MessageComponent          `json:"components"`
+	Embeds          []*MessageEmbed             `json:"embeds,omitempty"`
+	AllowedMentions *MessageAllowedMentions     `json:"allowed_mentions,omitempty"`
+	Flags           InteractionResponseDataFlag `json:"flags,omitempty"`
+	Files           []*File                     `json:"-"`
 
 	// NOTE: autocomplete interaction only.
 	Choices []*ApplicationCommandOptionChoice `json:"choices,omitempty"`
+}
+
+// MessageInteraction is the data for an Interaction, when in a Message object.
+type MessageInteraction struct {
+	ID   string          `json:"id"`
+	Type InteractionType `json:"type"`
+	Name string          `json:"name"`
+	User User            `json:"user"`
 }
 
 // VerifyInteraction implements message verification of the discord interactions api
